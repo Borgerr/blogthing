@@ -1,12 +1,10 @@
 use axum::{Router, extract::Path, http::StatusCode, response::Html, routing::get};
 use clap::Parser;
 use filetime::FileTime;
-use maud::{DOCTYPE, html};
+use maud::{DOCTYPE, Markup, html};
 
 //use std::path::Path;
 use std::{fs, path::PathBuf, sync::OnceLock};
-
-type Response = Html<(StatusCode, String)>;
 
 #[derive(Parser, Debug)]
 #[command(version("0.1.0"), about = "A webserver that converts local markdown files to served static HTML, ideal for low effort blogs.", long_about = None)]
@@ -72,7 +70,10 @@ async fn main() {
         .expect("something catastrophic happened while working");
 }
 
-async fn main_page() -> Response {
+/// Routed to from `/`.
+/// Collects all of the top headlines from markdown files in specified directory,
+/// and places them in a single page of links to each.
+async fn main_page() -> (StatusCode, Markup) {
     let dir_path = CMDLINE_ARGS
         .get()
         .unwrap()
@@ -89,6 +90,8 @@ async fn main_page() -> Response {
         })
         .collect();
 
+    // post-order corresponds to how long ago the file was modified
+    // XXX: assumes recently modified blogs (not recently created) want to be towards the top again
     markdown_files.sort_by(|md1, md2| {
         let md1_meta = fs::metadata(md1).unwrap();
         let md1_modtime = FileTime::from_last_modification_time(&md1_meta);
@@ -97,10 +100,33 @@ async fn main_page() -> Response {
         md2_modtime.cmp(&md1_modtime)
     });
 
-    let text = format!("{:?}", markdown_files);
-    Html((StatusCode::OK, text))
+    (
+        StatusCode::OK,
+        html! {
+            (DOCTYPE)
+            h1 { "Posts" }
+            ul {
+                @for md in markdown_files {
+                    @let html_name = md
+                        .with_extension("html")
+                        .file_name()
+                        .unwrap()
+                        .display()
+                        .to_string();
+                    li {
+                        a href=(format!("{}/{}", CMDLINE_ARGS
+                                .get()
+                                .unwrap()
+                                .external_addr,
+                                html_name))
+                        { (html_name) }
+                    }
+                }
+            }
+        },
+    )
 }
 
-async fn get_post(Path(requested): Path<String>) -> Response {
+async fn get_post(Path(requested): Path<String>) -> (StatusCode, Markup) {
     todo!("implement")
 }
