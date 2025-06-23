@@ -77,7 +77,6 @@ async fn main() {
         .expect("something catastrophic happened while working");
 }
 
-
 /// Formats a header for a webpage given a title.
 pub(crate) fn header(title: &str) -> Markup {
     html! {
@@ -101,11 +100,49 @@ pub(crate) fn get_post_title(md: PathBuf) -> Option<String> {
             .next()? // first line
             .ok()?
             .trim_start_matches("# ") // removes header formatting from markdown string
-                                      // TODO: do we want to enforce a h1 header?
+            // TODO: do we want to enforce a h1 header?
             .to_string(),
     )
 }
 
+pub(crate) fn dir_path() -> String {
+    CMDLINE_ARGS
+        .get()
+        .unwrap()
+        .markdown_dir
+        .clone()
+        .unwrap_or("./".to_string())
+}
+
 async fn get_post(Path(requested): Path<String>) -> (StatusCode, Markup) {
-    todo!("implement")
+    let notfound = (
+        StatusCode::NOT_FOUND,
+        html! {
+            ("Guh!")
+        },
+    );
+
+    // asserts requested file is html
+    // likely won't want to change this. keep it simple
+    match PathBuf::from(requested.clone()).extension() {
+        Some(os_str) => {
+            if os_str.to_str() != Some("html") {
+                return notfound;
+            }
+        }
+        None => return notfound,
+    };
+
+    let markdown_file_path =
+        PathBuf::from(format!("{}{}", dir_path(), requested)).with_extension("md");
+
+    match fs::exists(&markdown_file_path) {
+        Ok(true) => (
+            StatusCode::OK,
+            html! {
+                (markdown_file_path.display().to_string())
+            },
+        ),
+        Ok(false) | Err(_) => notfound,
+    }
 }

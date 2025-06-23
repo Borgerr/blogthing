@@ -2,26 +2,16 @@ use axum::http::StatusCode;
 use filetime::FileTime;
 use maud::{Markup, html};
 
-use super::{CMDLINE_ARGS, get_post_title, header};
+use super::{CMDLINE_ARGS, dir_path, get_post_title, header};
 
 //use std::path::Path;
-use std::{
-    fs,
-    path::PathBuf,
-};
+use std::{fs, path::PathBuf};
 
 /// Routed to from `/`.
 /// Collects all of the top headlines from markdown files in specified directory,
 /// and places them in a single page of links to each.
 pub async fn main_page() -> (StatusCode, Markup) {
-    let dir_path = CMDLINE_ARGS
-        .get()
-        .unwrap()
-        .markdown_dir
-        .clone()
-        .unwrap_or("./".to_string());
-
-    let mut markdown_files: Vec<PathBuf> = fs::read_dir(&dir_path)
+    let mut markdown_files: Vec<PathBuf> = fs::read_dir(&dir_path())
         .unwrap()
         .map(|p| p.unwrap().path())
         .filter(|pstr| match pstr.extension() {
