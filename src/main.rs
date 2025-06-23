@@ -1,10 +1,15 @@
-use axum::{Router, extract::Path, http::StatusCode, response::Html, routing::get};
+use axum::{Router, extract::Path, http::StatusCode, routing::get};
 use clap::Parser;
 use filetime::FileTime;
 use maud::{DOCTYPE, Markup, html};
 
 //use std::path::Path;
-use std::{fs, path::PathBuf, sync::OnceLock};
+use std::{
+    fs,
+    io::{self, BufRead},
+    path::PathBuf,
+    sync::OnceLock,
+};
 
 #[derive(Parser, Debug)]
 #[command(version("0.1.0"), about = "A webserver that converts local markdown files to served static HTML, ideal for low effort blogs.", long_about = None)]
@@ -103,27 +108,66 @@ async fn main_page() -> (StatusCode, Markup) {
     (
         StatusCode::OK,
         html! {
-            (DOCTYPE)
-            h1 { "Posts" }
+            (header("blog"))    // TODO: allow config?
             ul {
-                @for md in markdown_files {
-                    @let html_name = md
-                        .with_extension("html")
-                        .file_name()
-                        .unwrap()
-                        .display()
-                        .to_string();
-                    li {
-                        a href=(format!("{}/{}", CMDLINE_ARGS
-                                .get()
-                                .unwrap()
-                                .external_addr,
-                                html_name))
-                        { (html_name) }
+                @for md in markdown_files { // TODO: we definitely want to encapsulate in
+                                            // another function. This will get very big.
+                    @if let Some(entry) = mainpage_entry(md) {
+                        (entry)
                     }
                 }
             }
         },
+    )
+}
+
+/// Formats a header for a webpage given a title.
+fn header(title: &str) -> Markup {
+    html! {
+        (DOCTYPE)
+        meta charset="utf-8";
+        // TODO: add link to main page
+        h1 { (title) }  // TODO: possibly want to allow this to be different
+    }
+}
+
+/// Formats an entry (as a PathBuf) on the main blog page.
+/// Currently assumes first line will always be encoded with a `#` at the start
+/// for a h1 heading in Markdown.
+fn mainpage_entry(md: PathBuf) -> Option<Markup> {
+    let title = get_post_title(md.clone())?;
+    Some(html! {
+        @let html_name = md
+            .with_extension("html")
+            .file_name()
+            .unwrap()
+            .display()
+            .to_string();
+        li {
+            a href=(format!("{}/{}",
+                        CMDLINE_ARGS.get().unwrap().external_addr,
+                        html_name
+                    ))
+            { (title) }
+        }
+    })
+}
+
+/// Gets the title of a post.
+/// Currently assumes first line of the post will always be encoded with a `#` at the start
+/// for a h1 heading in Markdown.
+fn get_post_title(md: PathBuf) -> Option<String> {
+    let file = fs::File::open(md).ok()?;
+    let reader = io::BufReader::new(file);
+
+    Some(
+        reader
+            .lines()
+            .into_iter()
+            .next()? // first line
+            .ok()?
+            .trim_start_matches("# ") // removes header formatting from markdown string
+            .to_string(),
     )
 }
 
