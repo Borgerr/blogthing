@@ -80,16 +80,22 @@ async fn main_page() -> Response {
         .clone()
         .unwrap_or("./".to_string());
 
-    let markdown_files: Vec<PathBuf> = fs::read_dir(&dir_path)
+    let mut markdown_files: Vec<PathBuf> = fs::read_dir(&dir_path)
         .unwrap()
         .map(|p| p.unwrap().path())
-        .filter(|pstr| {
-            match pstr.extension() {
-                Some(x) => x == "md",
-                None => false
-            }
+        .filter(|pstr| match pstr.extension() {
+            Some(x) => x == "md",
+            None => false,
         })
         .collect();
+
+    markdown_files.sort_by(|md1, md2| {
+        let md1_meta = fs::metadata(md1).unwrap();
+        let md1_modtime = FileTime::from_last_modification_time(&md1_meta);
+        let md2_meta = fs::metadata(md2).unwrap();
+        let md2_modtime = FileTime::from_last_modification_time(&md2_meta);
+        md2_modtime.cmp(&md1_modtime)
+    });
 
     let text = format!("{:?}", markdown_files);
     Html((StatusCode::OK, text))
