@@ -2,7 +2,7 @@ use axum::http::StatusCode;
 use filetime::FileTime;
 use maud::{Markup, html};
 
-use super::{CMDLINE_ARGS, dir_path, get_post_title, header};
+use crate::{dir_path, get_post_title, header};
 
 //use std::path::Path;
 use std::{fs, path::PathBuf};
@@ -58,10 +58,7 @@ fn mainpage_entry(md: PathBuf) -> Option<Markup> {
             .display()
             .to_string();
         li {
-            a href=(format!("{}/{}",
-                        CMDLINE_ARGS.get().unwrap().external_addr,
-                        html_name
-                    ))
+            a href=(html_name)
             { (title) }
         }
     })

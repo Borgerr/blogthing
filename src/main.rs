@@ -1,8 +1,7 @@
-use axum::{Router, extract::Path, http::StatusCode, routing::get};
+use axum::{Router, routing::get};
 use clap::Parser;
 use maud::{DOCTYPE, Markup, html};
 
-//use std::path::Path;
 use std::{
     fs,
     io::{self, BufRead},
@@ -12,6 +11,8 @@ use std::{
 
 mod mainpage;
 use mainpage::main_page;
+mod posts;
+use posts::get_post;
 
 #[derive(Parser, Debug)]
 #[command(version("0.1.0"), about = "A webserver that converts local markdown files to served static HTML, ideal for low effort blogs.", long_about = None)]
@@ -64,11 +65,6 @@ async fn main() {
     };
     // EVERYTHING after should have CMDLINE_ARGS accessible
     // as it's readonly and has, by now, been read
-    /*
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .expect("was unable ")
-    */
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect("was unable to bind to specified port");
@@ -79,11 +75,12 @@ async fn main() {
 
 /// Formats a header for a webpage given a title.
 pub(crate) fn header(title: &str) -> Markup {
+    // TODO: do we want custom headers?
     html! {
         (DOCTYPE)
         meta charset="utf-8";
         // TODO: add link to main page
-        h1 { (title) }  // TODO: possibly want to allow this to be different
+        h1 { (title) }  // TODO: this kinda sucks, should remove
     }
 }
 
@@ -114,35 +111,3 @@ pub(crate) fn dir_path() -> String {
         .unwrap_or("./".to_string())
 }
 
-async fn get_post(Path(requested): Path<String>) -> (StatusCode, Markup) {
-    let notfound = (
-        StatusCode::NOT_FOUND,
-        html! {
-            ("Guh!")
-        },
-    );
-
-    // asserts requested file is html
-    // likely won't want to change this. keep it simple
-    match PathBuf::from(requested.clone()).extension() {
-        Some(os_str) => {
-            if os_str.to_str() != Some("html") {
-                return notfound;
-            }
-        }
-        None => return notfound,
-    };
-
-    let markdown_file_path =
-        PathBuf::from(format!("{}{}", dir_path(), requested)).with_extension("md");
-
-    match fs::exists(&markdown_file_path) {
-        Ok(true) => (
-            StatusCode::OK,
-            html! {
-                (markdown_file_path.display().to_string())
-            },
-        ),
-        Ok(false) | Err(_) => notfound,
-    }
-}
